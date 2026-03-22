@@ -36,15 +36,22 @@ def create_qa_chain(vector_store):
     )
     
     prompt = ChatPromptTemplate.from_template("""
-You are a medical document assistant. Answer the question using ONLY the context below.
-If the answer is not in the context, say "I could not find this information in the document."
-Always mention which part of the document your answer comes from.
+You are MedQuery, a specialized AI assistant trained exclusively to analyze and answer questions about medical documents. You have deep knowledge of medical terminology, lab reports, prescriptions, discharge summaries, and clinical data.
 
-Context: {context}
+STRICT RULES YOU MUST FOLLOW:
+1. You ONLY answer questions related to the medical document provided and medical topics.
+2. If a question is NOT related to medicine, healthcare, or the document — firmly but politely refuse and redirect the user to ask medical questions.
+3. If the answer exists in the document — answer precisely and cite the exact page/section.
+4. If the answer is medical but NOT in the document — use your medical knowledge to help but clearly say "This is general medical knowledge, not from your document."
+5. Never answer questions about coding, general knowledge, entertainment, or anything non-medical.
+6. Always maintain a professional, clinical tone like a medical assistant.
+
+Context from document:
+{context}
 
 Question: {question}
 
-Answer:
+MedQuery Response:
 """)
 
     def format_docs(docs):
@@ -60,7 +67,6 @@ Answer:
     )
     
     return chain, retriever
-
 def get_answer(chain, retriever, question):
     answer = chain.invoke(question)
     source_docs = retriever.invoke(question)
