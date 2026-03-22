@@ -4,6 +4,45 @@ from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import tempfile
 import os
+import time
+from datetime import datetime, timedelta
+
+
+def check_rate_limit():
+    now = datetime.now()
+    
+    if "request_count" not in st.session_state:
+        st.session_state.request_count = 0
+    if "window_start" not in st.session_state:
+        st.session_state.window_start = now
+    if "daily_count" not in st.session_state:
+        st.session_state.daily_count = 0
+    if "daily_reset" not in st.session_state:
+        st.session_state.daily_reset = now + timedelta(days=1)
+
+    # Reset per-minute window
+    if now - st.session_state.window_start > timedelta(minutes=1):
+        st.session_state.request_count = 0
+        st.session_state.window_start = now
+
+    # Reset daily window
+    if now > st.session_state.daily_reset:
+        st.session_state.daily_count = 0
+        st.session_state.daily_reset = now + timedelta(days=1)
+
+    # Limits: 5 requests per minute, 20 per day
+    if st.session_state.request_count >= 5:
+        wait = 60 - (now - st.session_state.window_start).seconds
+        st.error(f"⏳ Rate limit reached. Please wait {wait} seconds before asking again.")
+        return False
+
+    if st.session_state.daily_count >= 20:
+        st.error("📵 Daily limit of 20 questions reached. Please come back tomorrow.")
+        return False
+
+    st.session_state.request_count += 1
+    st.session_state.daily_count += 1
+    return True
 
 load_dotenv()
 
@@ -85,6 +124,9 @@ for message in st.session_state.chat_history:
 if st.session_state.chain:
     question = st.chat_input("Ask a medical question about your document...")
     if question:
+        if not check_rate_limit():
+            st.stop()
+            
         st.session_state.chat_history.append({"role": "user", "content": question})
         with st.chat_message("user"):
             st.write(question)
