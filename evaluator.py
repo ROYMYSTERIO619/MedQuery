@@ -19,19 +19,16 @@ def get_llm():
         temperature=0.0
     )
 
-# ─── Metric 1: Faithfulness ───────────────────────────
+# Metric 1: Faithfulness
 
 def evaluate_faithfulness(answer, source_docs, llm):
-    """
-    Measures if the answer is actually grounded in retrieved chunks.
-    Score 0-10: 10 = fully grounded, 0 = hallucinated
-    """
+    """Measures if the answer is grounded in retrieved chunks (0-10)."""
     context = "\n\n".join(doc.page_content for doc in source_docs)
 
     prompt = ChatPromptTemplate.from_template("""
 You are evaluating faithfulness of a medical AI response.
 
-If the answer starts with "⚠️ Not found in your document" — score it 7/10 by default
+If the answer starts with "⚠️ Not found in your document" - score it 7/10 by default
 since it correctly admitted the document doesn't contain the answer.
 
 Otherwise rate 0-10:
@@ -55,14 +52,10 @@ Faithfulness score:""")
     except:
         return 0.0
 
-# ─── Metric 2: Answer Relevance ──────────────────────
+# Metric 2: Answer Relevance
 
 def evaluate_answer_relevance(question, answer):
-    """
-    Measures if the answer actually addresses the question.
-    Uses cosine similarity between question and answer embeddings.
-    Score 0-1: 1 = perfectly relevant, 0 = completely off-topic
-    """
+    """Measures answer relevance using cosine similarity (0-1)."""
     try:
         q_embedding = embeddings.embed_query(question)
         a_embedding = embeddings.embed_query(answer)
@@ -77,13 +70,10 @@ def evaluate_answer_relevance(question, answer):
     except:
         return 0.0
 
-# ─── Metric 3: Retrieval Precision ───────────────────
+# Metric 3: Retrieval Precision
 
 def evaluate_retrieval_precision(question, source_docs, llm):
-    """
-    Measures what % of retrieved chunks are actually relevant
-    to the question. Scores each chunk 0 or 1.
-    """
+    """Measures the percentage of retrieved chunks that are relevant to the question."""
     if not source_docs:
         return 0.0
 
@@ -111,14 +101,10 @@ Relevant (1/0):""")
 
     return round(sum(scores) / len(scores), 2) if scores else 0.0
 
-# ─── Metric 4: Context Utilisation ───────────────────
+# Metric 4: Context Utilisation
 
 def evaluate_context_utilisation(answer, source_docs):
-    """
-    Measures how much of the retrieved context was
-    actually used in generating the answer.
-    Uses word overlap as a proxy metric.
-    """
+    """Measures how much of the retrieved context was used in the answer."""
     if not source_docs:
         return 0.0
 
@@ -147,13 +133,10 @@ def evaluate_context_utilisation(answer, source_docs):
     utilisation = len(overlap) / len(answer_words)
     return round(min(utilisation, 1.0), 2)
 
-# ─── Master evaluation function ──────────────────────
+# Master evaluation function
 
 def evaluate_response(question, answer, source_docs):
-    """
-    Runs all 4 metrics and returns a complete evaluation report.
-    Called after every answer generation.
-    """
+    """Runs all 4 metrics and returns a complete evaluation report."""
     llm = get_llm()
 
     faithfulness = evaluate_faithfulness(answer, source_docs, llm)
@@ -161,7 +144,7 @@ def evaluate_response(question, answer, source_docs):
     precision = evaluate_retrieval_precision(question, source_docs, llm)
     utilisation = evaluate_context_utilisation(answer, source_docs)
 
-    # Overall score — weighted average
+    # Overall score - weighted average
     overall = round(
         (faithfulness / 10 * 0.4) +
         (relevance * 0.3) +

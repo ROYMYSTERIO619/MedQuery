@@ -1,8 +1,4 @@
-"""
-MedQuery — PDF Report Exporter
-Generates a professional medical consultation report from chat history.
-Uses fpdf2 for PDF generation.
-"""
+"""MedQuery - PDF Report Exporter. Generates professional medical consultation reports."""
 
 from fpdf import FPDF
 from datetime import datetime
@@ -62,19 +58,10 @@ def _get_grade_info(overall_pct):
 
 
 def generate_pdf_report(chat_history, doc_names=None):
-    """
-    Generate a formatted PDF report from chat history.
-
-    Args:
-        chat_history: list of dicts with 'role', 'content', optional 'sources', 'evaluation'
-        doc_names: list of uploaded document filenames
-
-    Returns:
-        bytes — the PDF file content
-    """
+    """Generate a formatted PDF report from chat history."""
     pdf = MedQueryPDF()
 
-    # ─── Cover Page ───────────────────────────────────────
+    # Cover Page
     pdf.add_page()
 
     # Title block
@@ -116,7 +103,7 @@ def generate_pdf_report(chat_history, doc_names=None):
              "It is for informational purposes only and does not constitute medical advice.",
              align="C", new_x="LMARGIN", new_y="NEXT")
 
-    # ─── Q&A Pages ────────────────────────────────────────
+    # Q&A Pages
     exchange_num = 0
     i = 0
     while i < len(chat_history):
@@ -142,7 +129,7 @@ def generate_pdf_report(chat_history, doc_names=None):
             pdf.line(10, pdf.get_y(), 200, pdf.get_y())
             pdf.ln(5)
 
-            # Question block — blue background
+            # Question block - blue background
             pdf.set_fill_color(230, 240, 255)
             pdf.set_font("Helvetica", "B", 11)
             pdf.set_text_color(20, 20, 20)
@@ -224,5 +211,5 @@ def generate_pdf_report(chat_history, doc_names=None):
 
         i += 1
 
-    # ─── Generate bytes ───────────────────────────────────
+    # Generate bytes
     return pdf.output()

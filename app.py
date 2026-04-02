@@ -13,14 +13,10 @@ from datetime import datetime, timedelta
 
 load_dotenv()
 
-# ─── Lightweight Conversation Memory ──────────────────
+# Lightweight Conversation Memory
 
 class ConversationMemory:
-    """
-    Sliding-window conversation memory.
-    Keeps the last k exchanges (human + AI pairs).
-    Drop-in replacement for LangChain's deprecated ConversationBufferWindowMemory.
-    """
+    """Sliding-window conversation memory. Keeps the last k exchanges (human + AI pairs)."""
     def __init__(self, k=5):
         self.k = k
         self.exchanges = []  # list of (human_input, ai_output)
@@ -46,7 +42,7 @@ class ConversationMemory:
     def clear(self):
         self.exchanges = []
 
-# ─── Rate Limiter ─────────────────────────────────────
+# Rate Limiter
 
 def check_rate_limit():
     now = datetime.now()
@@ -75,7 +71,7 @@ def check_rate_limit():
     st.session_state.daily_count += 1
     return True
 
-# ─── Medical Validator ────────────────────────────────
+# Medical Validator
 
 def is_medical_document(chunks):
     strong_medical_keywords = [
@@ -92,7 +88,7 @@ def is_medical_document(chunks):
     matches = sum(1 for word in strong_medical_keywords if word in full_text)
     return matches >= 5
 
-# ─── Feature 4: Confidence Grade ─────────────────────
+# Feature 4: Confidence Grade
 
 def get_confidence_grade(overall_pct, source_docs=None):
     """Returns (grade, emoji, explanation) with optional source page citation."""
@@ -103,13 +99,13 @@ def get_confidence_grade(overall_pct, source_docs=None):
             page_hint = f" (page {int(first_page) + 1})"
 
     if overall_pct >= 90:
-        return "A", "🟢", f"Very high confidence — answer fully supported by document{page_hint}"
+        return "A", "🟢", f"Very high confidence - answer fully supported by document{page_hint}"
     elif overall_pct >= 75:
-        return "B", "🟡", f"High confidence — answer mostly supported by document{page_hint}"
+        return "B", "🟡", f"High confidence - answer mostly supported by document{page_hint}"
     elif overall_pct >= 60:
-        return "C", "🟠", f"Medium confidence — some claims may need verification"
+        return "C", "🟠", f"Medium confidence - some claims may need verification"
     else:
-        return "D", "🔴", f"Low confidence — treat this answer with caution"
+        return "D", "🔴", f"Low confidence - treat this answer with caution"
 
 
 def render_confidence_badge(grade, emoji, explanation):
@@ -131,7 +127,7 @@ def render_confidence_badge(grade, emoji, explanation):
     """, unsafe_allow_html=True)
 
 
-# ─── Feature 1: Memory Helper ────────────────────────
+# Feature 1: Memory Helper
 
 def get_memory_string():
     """Get formatted conversation history from memory."""
@@ -146,14 +142,14 @@ def save_to_memory(question, answer):
         st.session_state.memory.save_context(question, answer)
 
 
-# ─── Page Config ──────────────────────────────────────
+# Page Config
 
 st.set_page_config(page_title="MedQuery", page_icon="🏥", layout="centered")
 st.title("🏥 MedQuery")
 st.caption("Advanced RAG · Hybrid Search · Evaluation Metrics · Conversation Memory · Document Comparison")
 st.warning("⚠️ For informational purposes only. Not a substitute for professional medical advice.")
 
-# ─── Session State Init ───────────────────────────────
+# Session State Init
 
 defaults = {
     "prompt": None, "llm": None, "bm25": None,
@@ -175,7 +171,7 @@ for key, val in defaults.items():
     if key not in st.session_state:
         st.session_state[key] = val
 
-# ─── Feature 2: Mode Toggle ──────────────────────────
+# Feature 2: Mode Toggle
 
 mode = st.radio(
     "Mode",
@@ -185,15 +181,13 @@ mode = st.radio(
 )
 is_compare = (mode == "🔀 Compare Documents")
 
-# ─── Feature 1: Memory Indicator ─────────────────────
+# Feature 1: Memory Indicator
 
 if st.session_state.memory is not None and st.session_state.memory.turn_count > 0:
     turns = st.session_state.memory.turn_count
-    st.info(f"🧠 Conversation memory active — {turns} turn{'s' if turns != 1 else ''} stored (last 5 kept)")
+    st.info(f"🧠 Conversation memory active - {turns} turn{'s' if turns != 1 else ''} stored (last 5 kept)")
 
-# ─────────────────────────────────────────────────────
-#  SINGLE DOCUMENT MODE
-# ─────────────────────────────────────────────────────
+# SINGLE DOCUMENT MODE
 
 if not is_compare:
 
@@ -241,10 +235,10 @@ if not is_compare:
 
         st.success(f"✅ {len(all_chunks)} chunks indexed from {len(uploaded_files)} document(s). Ready!")
 
-    # ─── Document Summary Panel ───────────────────────
+    # Document Summary Panel
 
     if st.session_state.doc_summary:
-        with st.expander("📋 Document Analysis — Key Findings & Summary", expanded=True):
+        with st.expander("📋 Document Analysis - Key Findings & Summary", expanded=True):
             lines = st.session_state.doc_summary.split('\n')
             for line in lines:
                 line = line.strip()
@@ -259,7 +253,7 @@ if not is_compare:
                 else:
                     st.write(line)
 
-    # ─── Chat History Display ─────────────────────────
+    # Chat History Display
 
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
@@ -268,7 +262,7 @@ if not is_compare:
                 if "sources" in message:
                     with st.expander("View sources"):
                         for i, source in enumerate(message["sources"]):
-                            st.markdown(f"**Source {i+1} — Page {source['page']}**")
+                            st.markdown(f"**Source {i+1} - Page {source['page']}**")
                             st.caption(source["content"])
                 if "evaluation" in message:
                     ev = message["evaluation"]
@@ -282,7 +276,7 @@ if not is_compare:
                         col3.metric("Precision", f"{ev['retrieval_precision_pct']}%")
                         col4.metric("Utilisation", f"{ev['context_utilisation_pct']}%")
 
-    # ─── Chat Input ───────────────────────────────────
+    # Chat Input
 
     if st.session_state.prompt:
         question = st.chat_input("Ask a medical question about your document...")
@@ -291,7 +285,7 @@ if not is_compare:
             if not check_rate_limit():
                 st.stop()
 
-            # Feature 1 — Get conversation history from LangChain memory
+            # Feature 1 - Get conversation history from LangChain memory
             chat_history = get_memory_string()
 
             st.session_state.chat_history.append({"role": "user", "content": question})
@@ -313,7 +307,7 @@ if not is_compare:
 
                 st.write(answer)
 
-                # Feature 4 — Styled confidence badge with source page
+                # Feature 4 - Styled confidence badge with source page
                 grade, emoji, explanation = get_confidence_grade(evaluation['overall_pct'], source_docs)
                 render_confidence_badge(grade, emoji, explanation)
 
@@ -326,7 +320,7 @@ if not is_compare:
                     for i, doc in enumerate(source_docs):
                         page = doc.metadata.get('page', 'N/A')
                         content = doc.page_content[:300]
-                        st.markdown(f"**Source {i+1} — Page {page}**")
+                        st.markdown(f"**Source {i+1} - Page {page}**")
                         st.caption(content)
                         sources.append({"page": page, "content": content})
 
@@ -346,7 +340,7 @@ if not is_compare:
                     """, unsafe_allow_html=True)
                     st.caption("Faithfulness · Relevance · Precision · Utilisation")
 
-            # Feature 1 — Save to LangChain memory
+            # Feature 1 - Save to LangChain memory
             save_to_memory(question, answer)
 
             st.session_state.chat_history.append({
@@ -361,9 +355,7 @@ if not is_compare:
         st.info("👆 Upload one or more medical PDFs above to get started.")
 
 
-# ─────────────────────────────────────────────────────
-#  FEATURE 2: DOCUMENT COMPARISON MODE
-# ─────────────────────────────────────────────────────
+# FEATURE 2: DOCUMENT COMPARISON MODE
 
 else:
     st.markdown("---")
@@ -437,20 +429,20 @@ else:
             st.session_state.doc_summary_a = summary_a
             st.session_state.doc_summary_b = summary_b
 
-        st.success(f"✅ Both documents indexed — Report A: {len(chunks_a)} chunks, Report B: {len(chunks_b)} chunks. Ready to compare!")
+        st.success(f"✅ Both documents indexed - Report A: {len(chunks_a)} chunks, Report B: {len(chunks_b)} chunks. Ready to compare!")
 
-    # ─── Show summaries side by side ──────────────────
+    # Show summaries side by side
 
     if st.session_state.doc_summary_a and st.session_state.doc_summary_b:
         col_sa, col_sb = st.columns(2)
         with col_sa:
-            with st.expander("🔵 Report A — Summary", expanded=True):
+            with st.expander("🔵 Report A - Summary", expanded=True):
                 st.write(st.session_state.doc_summary_a)
         with col_sb:
-            with st.expander("🟠 Report B — Summary", expanded=True):
+            with st.expander("🟠 Report B - Summary", expanded=True):
                 st.write(st.session_state.doc_summary_b)
 
-    # ─── Comparison Chat History ──────────────────────
+    # Comparison Chat History
 
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
@@ -459,11 +451,11 @@ else:
                 if "sources_a" in message or "sources_b" in message:
                     with st.expander("🔵 Report A sources"):
                         for i, src in enumerate(message.get("sources_a", [])):
-                            st.markdown(f"**Source {i+1} — Page {src['page']}**")
+                            st.markdown(f"**Source {i+1} - Page {src['page']}**")
                             st.caption(src["content"])
                     with st.expander("🟠 Report B sources"):
                         for i, src in enumerate(message.get("sources_b", [])):
-                            st.markdown(f"**Source {i+1} — Page {src['page']}**")
+                            st.markdown(f"**Source {i+1} - Page {src['page']}**")
                             st.caption(src["content"])
                 if "evaluation" in message:
                     ev = message["evaluation"]
@@ -476,10 +468,10 @@ else:
                         col3.metric("Precision", f"{ev['retrieval_precision_pct']}%")
                         col4.metric("Utilisation", f"{ev['context_utilisation_pct']}%")
 
-    # ─── Comparison Chat Input ────────────────────────
+    # Comparison Chat Input
 
     if st.session_state.comparison_prompt:
-        question = st.chat_input("Compare the documents — e.g. 'How do the symptoms differ?'")
+        question = st.chat_input("Compare the documents - e.g. 'How do the symptoms differ?'")
 
         if question:
             if not check_rate_limit():
@@ -512,7 +504,7 @@ else:
 
                 st.write(answer)
 
-                # Feature 4 — Styled confidence badge
+                # Feature 4 - Styled confidence badge
                 grade, emoji, explanation = get_confidence_grade(evaluation['overall_pct'])
                 render_confidence_badge(grade, emoji, explanation)
 
@@ -525,7 +517,7 @@ else:
                     for i, doc in enumerate(docs_a):
                         page = doc.metadata.get('page', 'N/A')
                         content = doc.page_content[:300]
-                        st.markdown(f"**Source {i+1} — Page {page}**")
+                        st.markdown(f"**Source {i+1} - Page {page}**")
                         st.caption(content)
                         sources_a.append({"page": page, "content": content})
 
@@ -534,7 +526,7 @@ else:
                     for i, doc in enumerate(docs_b):
                         page = doc.metadata.get('page', 'N/A')
                         content = doc.page_content[:300]
-                        st.markdown(f"**Source {i+1} — Page {page}**")
+                        st.markdown(f"**Source {i+1} - Page {page}**")
                         st.caption(content)
                         sources_b.append({"page": page, "content": content})
 
@@ -553,7 +545,7 @@ else:
                     </div>
                     """, unsafe_allow_html=True)
 
-            # Feature 1 — Save to memory
+            # Feature 1 - Save to memory
             save_to_memory(question, answer)
 
             st.session_state.chat_history.append({
@@ -568,7 +560,7 @@ else:
         st.info("👆 Upload both Report A and Report B above to start comparing.")
 
 
-# ─── Bottom Controls ──────────────────────────────────
+# Bottom Controls
 
 if st.session_state.prompt or st.session_state.comparison_prompt:
     st.markdown("---")
@@ -584,7 +576,7 @@ if st.session_state.prompt or st.session_state.comparison_prompt:
             st.rerun()
 
     with col2:
-        # Feature 5 — Export as formatted PDF
+        # Feature 5 - Export as formatted PDF
         if st.session_state.chat_history:
             try:
                 pdf_bytes = generate_pdf_report(

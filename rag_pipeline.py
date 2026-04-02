@@ -14,7 +14,7 @@ import os
 
 load_dotenv()
 
-# ─── Step 1: Smart contextual chunking ────────────────
+# Step 1: Smart contextual chunking
 def load_and_chunk_pdf(pdf_path):
     loader = PyPDFLoader(pdf_path)
     documents = loader.load()
@@ -33,14 +33,14 @@ def load_and_chunk_pdf(pdf_path):
     return chunks
 
 
-# ─── Step 2: BM25 keyword index ───────────────────────
+# Step 2: BM25 keyword index
 def build_bm25_index(chunks):
     tokenized = [chunk.page_content.lower().split() for chunk in chunks]
     bm25 = BM25Okapi(tokenized)
     return bm25
 
 
-# ─── Step 3: Hybrid search with RRF ──────────────────
+# Step 3: Hybrid search with RRF
 def reciprocal_rank_fusion(dense_docs, sparse_docs, k=60):
     scores = {}
     doc_map = {}
@@ -71,7 +71,7 @@ def hybrid_search(query, vector_store, bm25, chunks, top_k=6):
     return fused[:top_k]
 
 
-# ─── Step 4: Query rewriting ─────────────────────────
+# Step 4: Query rewriting
 def rewrite_query(question, llm):
     rewrite_prompt = ChatPromptTemplate.from_template("""
 You are a medical search query optimizer.
@@ -87,7 +87,7 @@ Rewritten query:""")
     return rewritten.strip()
 
 
-# ─── Step 5: Cross-encoder re-ranking ────────────────
+# Step 5: Cross-encoder re-ranking
 def rerank_chunks(query, chunks, llm, top_n=3):
     if not chunks:
         return chunks
@@ -118,7 +118,7 @@ Relevance score (0-10):""")
     return [chunk for _, chunk in scored[:top_n]]
 
 
-# ─── Step 6: Vector store creation ───────────────────
+# Step 6: Vector store creation
 def create_vector_store(chunks):
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"
@@ -127,7 +127,7 @@ def create_vector_store(chunks):
     return vector_store
 
 
-# ─── Step 7: QA chain with full advanced pipeline ────
+# Step 7: QA chain with full advanced pipeline
 def create_qa_chain(vector_store, chunks):
     llm = ChatGroq(
         model="llama-3.3-70b-versatile",
@@ -142,15 +142,15 @@ You are MedQuery, a specialized medical document assistant with deep clinical kn
 
 RESPONSE RULES:
 1. First check if the answer exists in the context below.
-2. If YES — answer precisely from the document and cite the page/section.
-3. If NO — you MAY use general medical knowledge BUT you MUST:
+2. If YES - answer precisely from the document and cite the page/section.
+3. If NO - you MAY use general medical knowledge BUT you MUST:
    - Start with: "Not found in your document. Based on general medical knowledge:"
    - Give accurate, evidence-based medical information
    - End with: "Always consult a qualified physician before making medical decisions."
 4. For medicine recommendations specifically:
    - You CAN suggest common medications for conditions mentioned in the document
    - Always mention dosage ranges are general and must be confirmed by a doctor
-   - Never recommend specific brands — use generic drug names only
+   - Never recommend specific brands - use generic drug names only
 5. NEVER answer non-medical questions under any circumstance.
 6. Maintain professional, clinical tone always.
 7. If there is previous conversation, use it to understand follow-up questions.
@@ -207,11 +207,8 @@ def get_answer(prompt, llm, bm25, chunks, vector_store, question, chat_history="
 
     return answer, final_chunks, rewritten
 def generate_document_summary(chunks, llm):
-    """
-    Auto-generates executive summary + key findings + abnormal value flags
-    when a document is first uploaded.
-    """
-    # Take first 15 chunks for summary — covers most of the key content
+    """Auto-generates executive summary and abnormal value flags."""
+    # Take first 15 chunks for summary - covers most of the key content
     sample_text = "\n\n".join(
         chunk.page_content for chunk in chunks[:15]
     )
@@ -228,7 +225,7 @@ You are a medical document analyst. Analyze this medical document and provide:
 
 3. ABNORMAL VALUES: List any values that appear abnormal or concerning.
    Format exactly like this:
-   - ⚠️ [value name]: [value] — [why it's concerning]
+   - ⚠️ [value name]: [value] - [why it's concerning]
    If no abnormal values found, write: "No abnormal values detected."
 
 4. DOCUMENT TYPE: Identify what type of medical document this is
@@ -248,7 +245,7 @@ Analysis:""")
         return f"Summary generation failed: {e}"
 
 
-# ─── Feature 2: Document Comparison Mode ─────────────
+# Feature 2: Document Comparison Mode
 
 def create_comparison_chain(llm):
     """Create a specialized prompt for comparing two medical documents."""
