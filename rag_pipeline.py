@@ -144,7 +144,7 @@ RESPONSE RULES:
 1. First check if the answer exists in the context below.
 2. If YES — answer precisely from the document and cite the page/section.
 3. If NO — you MAY use general medical knowledge BUT you MUST:
-   - Start with: "⚠️ Not found in your document. Based on general medical knowledge:"
+   - Start with: "Not found in your document. Based on general medical knowledge:"
    - Give accurate, evidence-based medical information
    - End with: "Always consult a qualified physician before making medical decisions."
 4. For medicine recommendations specifically:
@@ -153,6 +153,10 @@ RESPONSE RULES:
    - Never recommend specific brands — use generic drug names only
 5. NEVER answer non-medical questions under any circumstance.
 6. Maintain professional, clinical tone always.
+7. If there is previous conversation, use it to understand follow-up questions.
+
+Previous conversation:
+{chat_history}
 
 Context from document:
 {context}
@@ -180,7 +184,7 @@ Verified answer:""")
     return chain.invoke({"context": context, "answer": answer})
 
 
-def get_answer(prompt, llm, bm25, chunks, vector_store, question):
+def get_answer(prompt, llm, bm25, chunks, vector_store, question, chat_history=""):
     rewritten = rewrite_query(question, llm)
 
     candidates = hybrid_search(rewritten, vector_store, bm25, chunks, top_k=8)
@@ -192,9 +196,136 @@ def get_answer(prompt, llm, bm25, chunks, vector_store, question):
     )
 
     chain = prompt | llm | StrOutputParser()
-    answer = chain.invoke({"context": context, "question": question})
+    answer = chain.invoke({
+        "context": context,
+        "question": question,
+        "chat_history": chat_history
+    })
 
     # self-check applied properly
     answer = self_check_answer(answer, context, llm)
 
     return answer, final_chunks, rewritten
+def generate_document_summary(chunks, llm):
+    """
+    Auto-generates executive summary + key findings + abnormal value flags
+    when a document is first uploaded.
+    """
+    # Take first 15 chunks for summary — covers most of the key content
+    sample_text = "\n\n".join(
+        chunk.page_content for chunk in chunks[:15]
+    )
+
+    summary_prompt = ChatPromptTemplate.from_template("""
+You are a medical document analyst. Analyze this medical document and provide:
+
+1. EXECUTIVE SUMMARY: A precise 3-sentence summary of what this document is about.
+
+2. KEY FINDINGS: Extract 5-8 key medical findings as bullet points.
+   Format exactly like this:
+   - Finding 1
+   - Finding 2
+
+3. ABNORMAL VALUES: List any values that appear abnormal or concerning.
+   Format exactly like this:
+   - ⚠️ [value name]: [value] — [why it's concerning]
+   If no abnormal values found, write: "No abnormal values detected."
+
+4. DOCUMENT TYPE: Identify what type of medical document this is
+   (e.g. Lab Report, Discharge Summary, Prescription, Clinical Research Paper)
+
+Medical document content:
+{text}
+
+Analysis:""")
+
+    chain = summary_prompt | llm | StrOutputParser()
+
+    try:
+        summary = chain.invoke({"text": sample_text[:4000]})
+        return summary
+    except Exception as e:
+        return f"Summary generation failed: {e}"
+
+
+# ─── Feature 2: Document Comparison Mode ─────────────
+
+def create_comparison_chain(llm):
+    """Create a specialized prompt for comparing two medical documents."""
+    comparison_prompt = ChatPromptTemplate.from_template("""
+You are MedQuery, a specialized medical document comparison assistant.
+
+You have been given content from TWO separate medical documents.
+Your job is to compare and contrast them based on the user's question.
+
+RESPONSE RULES:
+1. Always clearly label which document you are referencing: [Report A] or [Report B].
+2. When comparing values, present them side by side.
+3. Highlight key differences and similarities.
+4. Flag any medically significant discrepancies between the documents.
+5. NEVER answer non-medical questions under any circumstance.
+6. Maintain professional, clinical tone always.
+7. If there is previous conversation, use it to understand follow-up questions.
+
+Previous conversation:
+{chat_history}
+
+--- REPORT A ---
+{context_a}
+
+--- REPORT B ---
+{context_b}
+
+Question: {question}
+
+MedQuery Comparison Response:
+""")
+    return comparison_prompt
+
+
+def comparison_search(query, vs_a, bm25_a, chunks_a, vs_b, bm25_b, chunks_b, llm, top_k=4):
+    """
+    Search both document indexes and return tagged results from each.
+    Uses the same hybrid search + reranking pipeline per document.
+    """
+    rewritten = rewrite_query(query, llm)
+
+    # Search Report A
+    candidates_a = hybrid_search(rewritten, vs_a, bm25_a, chunks_a, top_k=6)
+    final_a = rerank_chunks(query, candidates_a, llm, top_n=top_k)
+
+    # Search Report B
+    candidates_b = hybrid_search(rewritten, vs_b, bm25_b, chunks_b, top_k=6)
+    final_b = rerank_chunks(query, candidates_b, llm, top_n=top_k)
+
+    return final_a, final_b, rewritten
+
+
+def get_comparison_answer(comparison_prompt, llm, question, docs_a, docs_b, chat_history=""):
+    """
+    Generate an answer comparing content from two documents.
+    """
+    context_a = "\n\n---\n\n".join(
+        f"[Page {doc.metadata.get('page', 'N/A')}]\n{doc.page_content}"
+        for doc in docs_a
+    )
+    context_b = "\n\n---\n\n".join(
+        f"[Page {doc.metadata.get('page', 'N/A')}]\n{doc.page_content}"
+        for doc in docs_b
+    )
+
+    chain = comparison_prompt | llm | StrOutputParser()
+    answer = chain.invoke({
+        "context_a": context_a,
+        "context_b": context_b,
+        "question": question,
+        "chat_history": chat_history
+    })
+
+    # Self-check against merged context
+    merged_context = f"REPORT A:\n{context_a}\n\nREPORT B:\n{context_b}"
+    answer = self_check_answer(answer, merged_context, llm)
+
+    # Merge source docs for evaluation (tag them)
+    all_sources = docs_a + docs_b
+    return answer, all_sources, docs_a, docs_b
